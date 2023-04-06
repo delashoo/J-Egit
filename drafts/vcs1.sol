@@ -6,6 +6,10 @@ import "ipfs://QmX9y6xgQQhjN42HdGWpKyEZ4wZ4nRdA4YMBKjzvVG9WnS/contracts/IPFS.sol
 
 contract VCS is IPFS {
 
+    event RepositoryCreated(bytes32 name, bytes description, address owner);
+    event BranchCreated(bytes32 repositoryName, bytes32 branchName);
+    event CommitCreated(bytes32 repositoryName, bytes32 branchName, bytes32 hash, bytes message, bytes32[] parentHashes, address author, uint256 timestamp);
+
     //contract describes 3 structs
     //Repository: includes the name of the repository, description, owner's address, an array of branches, and a mapping to check if a branch exists.
     struct Repository {
@@ -59,6 +63,8 @@ contract VCS is IPFS {
         });
 
         repositories[name].branchExists["master"] = true; //instantiate the repo
+
+        emit RepositoryCreated(name, description, msg.sender);
     }
 
     //createBranch: It takes the name of the repository and the name of the new branch as inputs and creates a new branch. 
@@ -75,6 +81,9 @@ contract VCS is IPFS {
         repositories[repositoryName].branches.push(branchName); //pushing new branch to the repo's branches
         
         repositories[repositoryName].branchExists[branchName] = true; //initiate
+
+        emit BranchCreated(repositoryName, branchName);
+
     }
 
     function commit(bytes32 repositoryName, bytes32 branchName, bytes32 hash, bytes32 message, string parentHashes) public {
@@ -109,6 +118,8 @@ contract VCS is IPFS {
 
         // Mark commit as existing in branch
         branches[repositoryName][branchName].commitExists[hash] = true;
+
+        emit CommitEvent(repositoryName, branchName, hash, message, parentHashes, msg.sender);
     }
 
     function getLatestCommit(bytes32 repositoryName, bytes32 branchName) public view returns (bytes32) {
@@ -128,6 +139,12 @@ contract VCS is IPFS {
         it takes the repository name, branch name, and commit hash as inputs and first checks if the commit exists in the specified branch. 
         If the commit exists, it returns the hash, message, parent hashes, author address, and timestamp stored in the Commit struct.
         */
+        /**
+                function getCommit(bytes32 repositoryName, bytes32 branchName, bytes32 hash) public view returns (uint256, bytes memory, bytes[] memory, address) {
+        Commit storage commit = commits[repositoryName][branchName][hash];
+        require(commit.hash != bytes32(0), "Commit does not exist");
+        return (commit.timestamp, commit.message, commit.parentHashes, commit.committer);
+         */
         require(branches[repositoryName][branchName].commitExists[commitHash], "Commit does not exist");
 
         Commit memory commit = commits[repositoryName][branchName][commitHash];
