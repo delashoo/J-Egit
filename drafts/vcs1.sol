@@ -9,8 +9,8 @@ contract VCS is IPFS {
     //contract describes 3 structs
     //Repository: includes the name of the repository, description, owner's address, an array of branches, and a mapping to check if a branch exists.
     struct Repository {
-        bytes32 name;
-        bytes32 description;
+        bytes name;
+        bytes description;
         address owner;
         bytes32[] branches;
         mapping(bytes32 => bool) branchExists;
@@ -18,7 +18,7 @@ contract VCS is IPFS {
 
     //Branch: It includes the name of the branch, the hash of the latest commit, and a mapping to check if a commit exists.
     struct Branch {
-        bytes32 name;
+        bytes name;
         bytes32 latestCommit;
         mapping(bytes32 => bool) commitExists;
     }
@@ -26,55 +26,67 @@ contract VCS is IPFS {
     //Commit: It includes the hash of the commit, the commit message, an array of parent hashes, the author's address, and the timestamp.
     struct Commit {
         bytes32 hash;
-        bytes32 message;
-        bytes32[] parentHashes;
+        bytes message;
+        string parentHashes;
         address author;
         uint256 timestamp;
     }
 
-    //The contract defines three mappings:
-    
+    //The contract defines three mappings;
     mapping(bytes32 => Repository) private repositories;     //repositories: It maps the name of a repository to its information.
     mapping(bytes32 => mapping(bytes32 => Branch)) private branches; // branches: It maps the name of a repository to its branches and each branch name to its information.
     mapping(bytes32 => mapping(bytes32 => mapping(bytes32 => Commit))) private commits; //Commit: It includes the hash of the commit, the commit message, an array of parent hashes, the author's address, and the timestamp.
 
 
-    //createRepository: It takes the name and description of the repository as inputs and creates a new repository. 
-    //It checks if the repository already exists by verifying if the "master" branch exists, and if not, it creates a new "master" branch and adds it to the repository's branches.
-    function createRepository(bytes32 name, bytes32 description) public {
-        require(!repositories[name].branchExists["master"], "Repository already exists");
+    //createRepository takes the name and description of the repository as inputs and creates a new repository. 
+    function createRepository(bytes name, bytes description) public {
 
+        //checks if repo's master branch exists mapping, branches are mapped with repo names.
+        require(!repositories[name].branchExists["master"], "Repository already exists"); 
+
+        //declaration of repo
         repositories[name] = Repository({
             name: name,
             description: description,
             owner: msg.sender,
-            branches: new bytes32[](1)
+            branches: new bytes[] (1)
         });
 
+        //sets branch name of the repo to "master"
         branches[name]["master"] = Branch({
             name: "master",
             latestCommit: bytes32(0)
         });
 
-        repositories[name].branchExists["master"] = true;
+        repositories[name].branchExists["master"] = true; //instantiate the repo
     }
 
     //createBranch: It takes the name of the repository and the name of the new branch as inputs and creates a new branch. 
     //It checks if the branch already exists, and if not, it adds the new branch to the repository's branches.
     function createBranch(bytes32 repositoryName, bytes32 branchName) public {
-        require(repositories[repositoryName].owner == msg.sender, "Only repository owner can create a branch");
-        require(!repositories[repositoryName].branchExists[branchName], "Branch already exists");
+        require(repositories[repositoryName].owner == msg.sender, "Only repository owner can create a branch"); //Verifies repo owner before creating branch >>error msg 'Only Owner'
+        require(!repositories[repositoryName].branchExists[branchName], "Branch already exists"); //checks if the branch already exists >> error msg 'branch exists'
 
-        repositories[repositoryName].branches.push(branchName);
+        //declaration of branch struct
         branches[repositoryName][branchName] = Branch({
             name: branchName,
             latestCommit: bytes32(0)
         });
-
-        repositories[repositoryName].branchExists[branchName] = true;
+        repositories[repositoryName].branches.push(branchName); //pushing new branch to the repo's branches
+        
+        repositories[repositoryName].branchExists[branchName] = true; //initiate
     }
 
-    function commit(bytes32 repositoryName, bytes32 branchName, bytes32 hash, bytes32 message, bytes32[] memory parentHashes) public {
+    function commit(bytes32 repositoryName, bytes32 branchName, bytes32 hash, bytes32 message, string parentHashes) public {
+
+        /**
+        This function allows a repository owner to make a new commit to a branch. 
+        It takes the repository name, branch name, commit hash, commit message, and an array of parent hashes as inputs. 
+        It first checks if the caller is the owner of the repository and if the branch exists.
+        Then it checks if all the parent commits exist by iterating through the parent hashes array and checking if each commit exists. 
+        If all parent commits exist, a new commit is created by storing the commit hash, message, parent hashes, author address, and timestamp in the commits mapping. 
+        The latest commit of the branch is updated to the new commit hash, and the commit is marked as existing in the branch.
+         */
         require(repositories[repositoryName].owner == msg.sender, "Only repository owner can commit");
         require(repositories[repositoryName].branchExists[branchName], "Branch does not exist");
 
@@ -100,12 +112,22 @@ contract VCS is IPFS {
     }
 
     function getLatestCommit(bytes32 repositoryName, bytes32 branchName) public view returns (bytes32) {
+        /**
+        This function returns the hash of the latest commit in a branch. 
+        It takes the repository name and branch name as inputs and first checks if the branch exists. 
+        if the branch exists, it returns the latest commit hash stored in the latestCommit field of the Branch struct.
+         */
         require(repositories[repositoryName].branchExists[branchName], "Branch does not exist");
 
         return branches[repositoryName][branchName].latestCommit;
     }
 
     function getCommit(bytes32 repositoryName, bytes32 branchName, bytes32 commitHash) public view returns (bytes32 hash, bytes32 message, bytes32[] memory parentHashes, address author, uint256 timestamp) {
+
+        /* This function returns the information of a commit. 
+        it takes the repository name, branch name, and commit hash as inputs and first checks if the commit exists in the specified branch. 
+        If the commit exists, it returns the hash, message, parent hashes, author address, and timestamp stored in the Commit struct.
+        */
         require(branches[repositoryName][branchName].commitExists[commitHash], "Commit does not exist");
 
         Commit memory commit = commits[repositoryName][branchName][commitHash];
@@ -113,10 +135,19 @@ contract VCS is IPFS {
     }
 
     function getBranches(bytes32 repositoryName) public view returns (bytes32[] memory) {
+        /**
+        This function returns the list of all branches in a repository. 
+        It takes the repository name as an input and returns the array of branch names stored in the branches field of the Repository struct.
+        */
         return repositories[repositoryName].branches;
     }
 
     function getBranchLatestCommit(bytes32 repositoryName, bytes32 branchName) public view returns (bytes32) {
+        /**
+            This function returns the hash of the latest commit in a branch. 
+            It takes the repository name and variable number of branch names as inputs and first checks if each branch exists in the specified repository. 
+            If all branches exist, it returns an array of the latest commit hashes for each branch in the same order as the input branch names. 
+        */
         require(repositories[repositoryName].branchExists[branchName], "Branch does not exist");
 
         return branches[repositoryName][branchName].latestCommit;
@@ -149,30 +180,6 @@ getRevision(): This function may be used to retrieve information about a specifi
 merge(): This function may be used to combine two or more different revisions or branches of the contract's code or state. It may take arguments to specify the revisions or branches to be merged and may perform checks to ensure that the merge is valid. The function may also resolve conflicts that arise when two revisions or branches have made conflicting changes to the same code or state.
  */
 
- /***
- The last 5 functions of this VCS Solidity code are:
-
-commit: This function allows a repository owner to make a new commit to a branch. 
-It takes the repository name, branch name, commit hash, commit message, and an array of parent hashes as inputs. 
-It first checks if the caller is the owner of the repository and if the branch exists. T
-Then it checks if all the parent commits exist by iterating through the parent hashes array and checking if each commit exists. 
-If all parent commits exist, a new commit is created by storing the commit hash, message, parent hashes, author address, and timestamp in the commits mapping. 
-The latest commit of the branch is updated to the new commit hash, and the commit is marked as existing in the branch.
-
-getLatestCommit: This function returns the hash of the latest commit in a branch. 
-It takes the repository name and branch name as inputs and first checks if the branch exists. 
-if the branch exists, it returns the latest commit hash stored in the latestCommit field of the Branch struct.
-
-getCommit: This function returns the information of a commit. 
-it takes the repository name, branch name, and commit hash as inputs and first checks if the commit exists in the specified branch. 
-If the commit exists, it returns the hash, message, parent hashes, author address, and timestamp stored in the Commit struct.
-
-getBranches: This function returns the list of all branches in a repository. 
-It takes the repository name as an input and returns the array of branch names stored in the branches field of the Repository struct.
-
-getBranchLatestCommit: This function returns the hash of the latest commit in a branch. 
-It takes the repository name and variable number of branch names as inputs and first checks if each branch exists in the specified repository. If all branches exist, it returns an array of the latest commit hashes for each branch in the same order as the input branch names.
-  */
 
 // SPDX-License-Identifier: MIT
 
