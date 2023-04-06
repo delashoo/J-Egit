@@ -128,4 +128,159 @@ contract VCS is IPFS {
         Repository memory repository = repositories[repositoryName];
         return (repository.name, repository.description, repository.owner);
     }
+    /**
+    The code provided looks fairly efficient, but there are a few small changes that could improve its readability and maintainability:
+
+Use events to log repository, branch, and commit creations instead of relying solely on the function return values.
+Use bytes instead of bytes32 for message, name, and description variables to allow for longer input values.
+Use string instead of bytes32[] for parentHashes to make it easier to handle multiple parent commits.
+     */
+}
+
+/***
+initialize(): This function is often used to set up the initial state of the contract. It may assign values to state variables or perform other necessary setup operations. This function is usually called only once, when the contract is first deployed.
+
+commit(): This function is likely used to record changes to the contract's state. It may take arguments to specify the details of the change, such as the amount of ether being transferred or the new value of a state variable. The function may also perform checks to ensure that the change is valid before committing it to the contract's state.
+
+revert(): This function may be used to undo changes to the contract's state. It is usually called when an error or exception occurs during contract execution. The function may return any ether that was transferred during the failed transaction and restore the contract's state to its previous state.
+
+getRevision(): This function may be used to retrieve information about a specific revision or version of the contract's code or state. It may take an argument to specify the revision number or other details, and it may return information such as the author of the revision, the date it was made, or the changes that were made.
+
+merge(): This function may be used to combine two or more different revisions or branches of the contract's code or state. It may take arguments to specify the revisions or branches to be merged and may perform checks to ensure that the merge is valid. The function may also resolve conflicts that arise when two revisions or branches have made conflicting changes to the same code or state.
+ */
+
+ /***
+ The last 5 functions of this VCS Solidity code are:
+
+commit: This function allows a repository owner to make a new commit to a branch. 
+It takes the repository name, branch name, commit hash, commit message, and an array of parent hashes as inputs. 
+It first checks if the caller is the owner of the repository and if the branch exists. T
+Then it checks if all the parent commits exist by iterating through the parent hashes array and checking if each commit exists. 
+If all parent commits exist, a new commit is created by storing the commit hash, message, parent hashes, author address, and timestamp in the commits mapping. 
+The latest commit of the branch is updated to the new commit hash, and the commit is marked as existing in the branch.
+
+getLatestCommit: This function returns the hash of the latest commit in a branch. 
+It takes the repository name and branch name as inputs and first checks if the branch exists. 
+if the branch exists, it returns the latest commit hash stored in the latestCommit field of the Branch struct.
+
+getCommit: This function returns the information of a commit. 
+it takes the repository name, branch name, and commit hash as inputs and first checks if the commit exists in the specified branch. 
+If the commit exists, it returns the hash, message, parent hashes, author address, and timestamp stored in the Commit struct.
+
+getBranches: This function returns the list of all branches in a repository. 
+It takes the repository name as an input and returns the array of branch names stored in the branches field of the Repository struct.
+
+getBranchLatestCommit: This function returns the hash of the latest commit in a branch. 
+It takes the repository name and variable number of branch names as inputs and first checks if each branch exists in the specified repository. If all branches exist, it returns an array of the latest commit hashes for each branch in the same order as the input branch names.
+  */
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+import "ipfs://QmX9y6xgQQhjN42HdGWpKyEZ4wZ4nRdA4YMBKjzvVG9WnS/contracts/IPFS.sol";
+
+contract VCS is IPFS {
+
+    event RepositoryCreated(bytes32 name, bytes description, address owner);
+    event BranchCreated(bytes32 repositoryName, bytes32 branchName);
+    event CommitCreated(bytes32 repositoryName, bytes32 branchName, bytes32 hash, bytes message, bytes32[] parentHashes, address author, uint256 timestamp);
+
+    struct Repository {
+        bytes32 name;
+        bytes description;
+        address owner;
+        bytes32[] branches;
+        mapping(bytes32 => bool) branchExists;
+    }
+
+    struct Branch {
+        bytes32 name;
+        bytes32 latestCommit;
+        mapping(bytes32 => bool) commitExists;
+    }
+
+    struct Commit {
+        bytes32 hash;
+        bytes message;
+        bytes[] parentHashes;
+        address author;
+        uint256 timestamp;
+    }
+
+    mapping(bytes32 => Repository) private repositories;
+    mapping(bytes32 => mapping(bytes32 => Branch)) private branches;
+    mapping(bytes32 => mapping(bytes32 => mapping(bytes32 => Commit))) private commits;
+
+    function createRepository(bytes32 name, bytes memory description) public {
+        require(!repositories[name].branchExists["master"], "Repository already exists");
+
+        repositories[name] = Repository({
+            name: name,
+            description: description,
+            owner: msg.sender,
+            branches: new bytes32[](1)
+        });
+
+        branches[name]["master"] = Branch({
+            name: "master",
+            latestCommit: bytes32(0)
+        });
+
+        repositories[name].branchExists["master"] = true;
+
+        emit RepositoryCreated(name, description, msg.sender);
+    }
+
+    function createBranch(bytes32 repositoryName, bytes32 branchName) public {
+        require(repositories[repositoryName].owner == msg.sender, "Only repository owner can create a branch");
+        require(!repositories[repositoryName].branchExists[branchName], "Branch already exists");
+
+        repositories[repositoryName].branches.push(branchName);
+        branches[repositoryName][branchName] = Branch({
+            name: branchName,
+            latestCommit: bytes32(0)
+        });
+
+        repositories[repositoryName].branchExists[branchName] = true;
+
+        emit BranchCreated(repositoryName, branchName);
+    }
+
+    function commit(bytes32 repositoryName, bytes32 branchName, bytes32 hash, bytes memory message, bytes[] memory parentHashes) public {
+        require(repositories[repositoryName].owner == msg.sender, "Only repository owner can commit");
+        require(repositories[repositoryName].branchExists[branchName], "Branch does not exist");
+
+        for (uint i = 0; i < parentHashes.length; i++) {
+            require(commits[repositoryName][branchName][parentHashes[i]].hash != bytes32(0), "Parent commit does not exist");
+        }
+
+        commits[repositoryName][branchName][hash] = Commit({
+           
+        timestamp: block.timestamp,
+        message: message,
+        parentHashes: parentHashes,
+        hash: hash,
+        committer: msg.sender
+        });
+
+        emit CommitEvent(repositoryName, branchName, hash, message, parentHashes, msg.sender);
+    }
+
+    // Function to get the commit details
+    function getCommit(bytes32 repositoryName, bytes32 branchName, bytes32 hash) public view returns (uint256, bytes memory, bytes[] memory, address) {
+        Commit storage commit = commits[repositoryName][branchName][hash];
+        require(commit.hash != bytes32(0), "Commit does not exist");
+        return (commit.timestamp, commit.message, commit.parentHashes, commit.committer);
+    }
+
+    // Function to create a branch
+    function createBranch(bytes32 repositoryName, bytes32 branchName) public {
+        require(repositories[repositoryName].owner == msg.sender, "Only repository owner can create branch");
+        require(!repositories[repositoryName].branchExists[branchName], "Branch already exists");
+
+        repositories[repositoryName].branchExists[branchName] = true;
+
+        emit CreateBranchEvent(repositoryName, branchName, msg.sender);
+    }
 }
